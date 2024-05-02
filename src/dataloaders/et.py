@@ -12,7 +12,7 @@ from pandas.tseries import offsets
 from pandas.tseries.frequencies import to_offset
 import torch
 from torch.utils import data
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -591,7 +591,6 @@ class Weather(InformerSequenceDataset):
     init_defaults = {
         "size": None,
         "features": "S",
-        "target": "WetBulbCelsius",
         "variant": 0,
         "scale": True,
         "inverse": False,

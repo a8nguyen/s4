@@ -1,0 +1,35 @@
+# @package _global_
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: agc
+  - /task: regression
+  - /optimizer: adamw
+  - /scheduler: cosine_warmup
+
+dataset:
+  res:
+    - 128
+    - 128
+  ndim: 2
+  __l_max: ${dataset.res}
+
+task:
+  torchmetrics: null
+  metrics:
+    - binary_accuracy
+
+train:
+  monitor: val/binary_accuracy
+  mode: max
+
+trainer:
+  max_epochs: 20
+
+optimizer:
+  lr: 0.004
+  weight_decay: 0.01
+
+scheduler:
+  num_warmup_steps: 500
+  num_training_steps: 6000

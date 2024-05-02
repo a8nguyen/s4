@@ -682,7 +682,8 @@ def create_trainer(config):
         #     ckpt_callback = utils.instantiate(registry.callbacks, callback_args)
         #     # ckpt_callback.CHECKPOINT_NAME_LAST = 'last_' # now we have two last checkpoints, last.ckpt and last_.ckpt
         #     callbacks.append(ckpt_callback)
-
+    if config.trainer.accelator == 'gpu':
+        config.trainer.precision = "64"
     trainer = pl.Trainer(
         logger=logger,
         callbacks=callbacks,
@@ -722,7 +723,7 @@ def train(config):
             for name, param in model.named_parameters():
                 if not("decoder" in name): param.requires_grad = False
 
-
+    model = model.half()
     # Run initial validation epoch (useful for debugging, finetuning)
     if config.train.validate_at_start:
         print("Running validation before training")

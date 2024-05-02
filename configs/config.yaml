@@ -10,10 +10,11 @@ defaults:
   # # - task: multiclass_classification # Defines loss and metrics
   # # - encoder: null # Interface between data and model
   # # - decoder: null # Interface between model and targets
-  - callbacks: # Extra pytorch-lightning features
-    - base
-    - checkpoint
-    - rich # RichProgressBar and RichModelSummary
+  - callbacks:
+      # Extra pytorch-lightning features
+      - base
+      - checkpoint
+      - rich # RichProgressBar and RichModelSummary
 
 # Additional arguments used to configure the training loop
 # Most of these set combinations of options in the PL trainer, add callbacks, or add features to the optimizer
@@ -22,13 +23,13 @@ train:
   name: null # optional name for the run to make logging easier
   # These three options are used by callbacks (checkpoint, monitor) and scheduler
   # Most of them are task dependent and are set by the pipeline
-  interval: ??? # Should be specified by scheduler. Also used by LR monitor
-  monitor: ??? # Should be specified by pipeline. Used by scheduler (plateau) and checkpointer
-  mode: ??? # Should be specified by pipeline. Used by scheduler (plateau) and checkpointer
-  ema: 0.0 # Moving average model for validation # TODO move into callback
-  test: False # Test after training
-  debug: False # Special settings to make debugging more convenient
-  ignore_warnings: False # Disable python warnings
+  interval: '???' # Should be specified by scheduler. Also used by LR monitor
+  monitor: '???' # Should be specified by pipeline. Used by scheduler (plateau) and checkpointer
+  mode: '???' # Should be specified by pipeline. Used by scheduler (plateau) and checkpointer
+  ema: 0 # Moving average model for validation # TODO move into callback
+  test: false # Test after training
+  debug: false # Special settings to make debugging more convenient
+  ignore_warnings: false # Disable python warnings
 
   # These control state passing between batches
   state:
@@ -40,28 +41,32 @@ train:
   ckpt: null # Resume training
 
   optimizer_param_grouping:
-    bias_weight_decay: False
-    normalization_weight_decay: False
+    bias_weight_decay: false
+    normalization_weight_decay: false
 
-  disable_dataset: False # Disable dataset loading
+  disable_dataset: false # Disable dataset loading
   validate_at_start: false
 
   pretrained_model_path: null # Path to pretrained model
   pretrained_model_strict_load: true # Whether to load the pretrained model even if the model is not compatible
-  pretrained_model_state_hook: # Hook called on the loaded model's state_dict
+  pretrained_model_state_hook:
+    # Hook called on the loaded model's state_dict
     _name_: null
-  post_init_hook: # After initializing model, call method on model
+  post_init_hook:
+    # After initializing model, call method on model
     _name_: null
 
-  layer_decay: # Used for ImageNet finetuning
+  layer_decay:
+    # Used for ImageNet finetuning
     _name_: null
     decay: 0.7
 
   # PL 2.0 seems to have gotten rid of the trainer.track_grad_norm flag
   # We have a custom Callback (TrackNorms) that implements something similar
-  track_grad_norms: False
+  track_grad_norms: false
 
-tolerance: # fault tolerance for training on preemptible machines
+tolerance:
+  # fault tolerance for training on preemptible machines
   logdir: ./resume
   id: null # must be set to resume training on preemption
 
@@ -70,10 +75,10 @@ tolerance: # fault tolerance for training on preemptible machines
 # If other loggers are added, it would make sense to put this one level lower under train/ or logger/
 wandb:
   project: hippo
-  group: ""
+  group: ''
   job_type: training
   mode: online # choices=['online', 'offline', 'disabled']
-  save_dir: "."
+  save_dir: .
   id: null # pass correct id to resume experiment!
   # Below options should not need to be specified
   # entity: ""  # set to name of your wandb team or just remove it
