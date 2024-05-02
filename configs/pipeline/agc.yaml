@@ -17,14 +17,15 @@ dataset:
 task:
   torchmetrics: null
   metrics:
-    - binary_accuracy
+    - loss
 
 train:
-  monitor: val/binary_accuracy
-  mode: max
+  monitor: val/loss
+  mode: min
 
 trainer:
-  max_epochs: 20
+  #max_epochs: 20
+  val_check_interval: 0.2
 
 optimizer:
   lr: 0.004

@@ -238,7 +238,10 @@ class MassSpecDataset(Dataset):
             startMz = curRow['segmented'][0][0][0].as_py()
             endMz = curRow['segmented'][0][0][1].as_py()
             meta_predictors.append( [(endMz+startMz)/2, (endMz-startMz), 
-                                     curRow['agcs'][0].as_py(), float(dict(curRow['scanHeader'][0])["RawOvFtT"]) ] ) #center, width, agc, rawovftt
+                                    only_SIM_with_scanIndex['retentionTime'][pagcEnd].as_py()
+            ])
+                                    # curRow['agcs'][0].as_py(), 
+                                    #float(dict(curRow['scanHeader'][0])["RawOvFtT"]) ] ) #center, width, agc, rawovftt GLOBAL
             max_len=0
 
             if (pagcEnd < self.timestep-1 ):
@@ -309,52 +312,27 @@ class MassSpecDataset(Dataset):
 
         seq_x_raw = self.data_x_raw[s_begin:s_end]
         seq_x_meta = self.data_x_meta[s_begin:s_end]
-        seq_x_raw = np.concatenate(
-            [seq_x_raw, np.zeros((self.pred_len, self.data_x_raw.shape[-1]))], axis=0
+        seq_x_raw = np.concatenate( # batch, timestep, 2, maxlen
+            [seq_x_raw, np.zeros((self.pred_len, self.data_x_raw.shape[1], self.data_x_raw[2], self.data_x_raw[3]))], axis=0
         )
         seq_x_meta = np.concatenate(
             [seq_x_meta, np.zeros((self.pred_len, self.data_x_meta.shape[-1]))], axis=0
         )
 
-        if self.inverse:
-            seq_y = np.concatenate(
-                [
-                    self.data_x[r_begin : r_begin + self.label_len],
-                    self.data_y[r_begin + self.label_len : r_end],
-                ],
-                0,
-            )
-            raise NotImplementedError
-        else:
-            # seq_y = self.data_y[r_begin:r_end] # OLD in Informer codebase
-            seq_y = self.data_y[s_end:r_end]
 
-
-
-        if self.eval_stamp:
-            mark = self.data_stamp[s_begin:r_end] #TODO: REMOVE DATA_STAMP
-        else:
-            mark = self.data_stamp[s_begin:s_end]  #TODO: REMOVE DATA_STAMP
-            mark = np.concatenate([mark, np.zeros((self.pred_len, mark.shape[-1]))], axis=0)
-
-        if self.eval_mask:
-            mask = np.concatenate([np.zeros(self.seq_len), np.ones(self.pred_len)], axis=0)
-        else:
-            mask = np.concatenate([np.zeros(self.seq_len), np.zeros(self.pred_len)], axis=0)
+        seq_y = self.data_y[s_end:r_end]
+        mask = np.concatenate([np.zeros(self.seq_len), np.zeros(self.pred_len)], axis=0)
         mask = mask[:, None]
 
         # Add the mask to the timestamps: # 480, 5
         # mark = np.concatenate([mark, mask[:, np.newaxis]], axis=1)
 
-        seq_x = seq_x.astype(np.float32)
+        seq_x_raw = seq_x_raw.astype(np.float32)
+        seq_x_meta = seq_x_meta.astype(np.float32)
         seq_y = seq_y.astype(np.float32)
-        if self.timeenc == 0:
-            mark = mark.astype(np.int64)
-        else:
-            mark = mark.astype(np.float32)
         mask = mask.astype(np.int64)
 
-        return torch.tensor(seq_x), torch.tensor(seq_y), torch.tensor(mark), torch.tensor(mask)
+        return torch.tensor(seq_x_raw), torch.tensor(seq_y), torch.tensor(seq_x_meta), torch.tensor(mask)
 
     def __len__(self):
         return len(self.data_x) - self.seq_len - self.pred_len + 1
@@ -384,7 +362,7 @@ class MassSpecDataset(Dataset):
 
 
 class _Dataset_AGC(MassSpecDataset):
-    def __init__(self, data_path="WTH.csv", target="WetBulbCelsius", **kwargs):
+    def __init__(self, data_path="WTH.csv", target="filltime", **kwargs):
         super().__init__(data_path=data_path, target=target, **kwargs)
 
 
@@ -396,13 +374,13 @@ class AGC(MassSpecSequenceDataset):
     init_defaults = {
         "size": None,
         "offset": 4,
-        "target": "AGC",
+        "target": "filltime",
         "variant": 0,
-        "scale": True,
-        "inverse": False,
-        "timeenc": 0,
-        "freq": "h",
-        "cols": None,
+        "scale_raw": True,
+        "scale_meta": True,
+        "maxIT": 500,
+        "meta_features": True,
+        "timestep": 5,
     }
 
     variants = {

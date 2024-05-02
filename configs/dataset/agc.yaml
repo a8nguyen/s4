@@ -3,13 +3,25 @@ size:
     - 384
     - 96
     - 96
+offset: 4
 features: "S"
-target: "WetBulbCelsius"
+target: "filltime"
 variant: 0
-scale: True
-inverse: False
-timeenc: 0
-eval_stamp: False
-eval_mask: False
+scale_raw: True
+scale_meta: True
+maxIT: 500
+meta_features: True
+timestep: 5
 # freq: 'h'
 __l_max: ${eval:${.size.0}+${.size.2}}
+
+
+"size": None,
+        "offset": 4,
+        "target": "filltime",
+        "variant": 0,
+        "scale_raw": True,
+        "scale_meta": True,
+        "maxIT": 500,
+        "meta_features": True,
+        "timestep": 5,
