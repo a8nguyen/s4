@@ -682,7 +682,7 @@ def create_trainer(config):
         #     ckpt_callback = utils.instantiate(registry.callbacks, callback_args)
         #     # ckpt_callback.CHECKPOINT_NAME_LAST = 'last_' # now we have two last checkpoints, last.ckpt and last_.ckpt
         #     callbacks.append(ckpt_callback)
-    if config.trainer.accelator == 'gpu':
+    if config.trainer.accelerator == 'gpu':
         config.trainer.precision = "64"
     trainer = pl.Trainer(
         logger=logger,

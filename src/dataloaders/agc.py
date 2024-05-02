@@ -84,9 +84,7 @@ class MassSpecSequenceDataset(SequenceDataset):
     def d_input(self):
         return self.dataset_train.d_input
 
-    @property_15_under400width
-    def d_output(self):
-        return self.dataset_train.d_output
+
 
     @property
     def l_output(self):
