@@ -227,7 +227,7 @@ class MassSpecDataset(Dataset):
         meta_predictors = []
 
         predictions = []
-        for row in range(only_SIM.num_rows):
+        for row in range(1000): #range(only_SIM.num_rows):
             meta = []
             curRow = only_SIM.take([row])
             iit = curRow['iit'][0].as_py()
@@ -359,17 +359,17 @@ class MassSpecDataset(Dataset):
         return torch.tensor(seq_x_raw), torch.tensor(seq_y), torch.tensor(seq_x_meta), torch.tensor(mask)
 
     def __len__(self):
-        return len(self.data_x) - self.seq_len - self.pred_len + 1
+        return len(self.data_x_meta) - self.seq_len - self.pred_len + 1
 
 
     @property
     def d_input(self):
-        return self.data_x.shape[-1]
+        return self.data_x_meta.shape[-1]
 
     @property
     def d_output(self):
         if self.features in ["M", "S"]:
-            return self.data_x.shape[-1]
+            return self.data_x_meta.shape[-1]
         elif self.features == "MS":
             return 1
         else:

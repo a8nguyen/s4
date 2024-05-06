@@ -15,18 +15,18 @@ task:
 train:
   monitor: val/loss
   mode: min
-  ema: 5
+  ema: 0.25
 
 encoder:
-  - embedding
-  - _name_: time
-
+  _name_: patch3d
+  d_emb: 256
+  filter_sizes: [2,16,16]
 decoder:
   _name_: sequence
   mode: pool
 
 trainer:
-  max_epochs: 5
+  max_epochs: 20
   val_check_interval: 0.2
 
 optimizer:

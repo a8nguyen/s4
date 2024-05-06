@@ -723,7 +723,7 @@ def train(config):
             for name, param in model.named_parameters():
                 if not("decoder" in name): param.requires_grad = False
 
-    model = model.half()
+    #model = model.half()
     # Run initial validation epoch (useful for debugging, finetuning)
     if config.train.validate_at_start:
         print("Running validation before training")
