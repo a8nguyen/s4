@@ -7,13 +7,6 @@ defaults:
   - /optimizer: adamw
   - /scheduler: cosine_warmup
 
-dataset:
-  res:
-    - 128
-    - 128
-  ndim: 2
-  __l_max: ${dataset.res}
-
 task:
   torchmetrics: null
   metrics:
@@ -22,9 +15,18 @@ task:
 train:
   monitor: val/loss
   mode: min
+  ema: 5
+
+encoder:
+  - embedding
+  - _name_: time
+
+decoder:
+  _name_: sequence
+  mode: pool
 
 trainer:
-  #max_epochs: 20
+  max_epochs: 5
   val_check_interval: 0.2
 
 optimizer:

@@ -53,16 +53,21 @@ class SignalNormScaler:
     def scale_mz(self, raw_data_full, centers_full):
         batch_size = raw_data_full.shape[0]  # batch, timestep, 2, maxlen
         time_step = raw_data_full.shape[1]
-        centers = centers_full.reshape((batch_size, time_step, 1))
+        centers = centers_full.reshape((batch_size, 1, 1))
         raw_data_full[:, :, 0] = raw_data_full[:, :, 0] - centers
 
     def scale_intens(self, raw_data_full, factors_full):
         batch_size = raw_data_full.shape[0]  # batch, timestep, 2, maxlen
         time_step = raw_data_full.shape[1]
         factors = factors_full.reshape((batch_size, time_step, 1))
-        raw_data_full[:, :, 0] = raw_data_full[:, :, 0] * factors
+        raw_data_full[:, :, 0] = raw_data_full[:, :, 0] / factors
 
 
+def _split_into_subsequences(sequence, subsequence_length):
+    return [sequence[i:i+subsequence_length] for i in range(0, len(sequence), subsequence_length)]
+
+def _pad_sequences(sequences, max_length, padding_value=0):
+    return [seq + [padding_value]*(max_length - len(seq)) for seq in sequences]
 
 def _getWithinWindows(mzs, intens, startMz, endMz, offset = 4):
     mzs_intens = list(zip(mzs, intens))
@@ -70,6 +75,8 @@ def _getWithinWindows(mzs, intens, startMz, endMz, offset = 4):
     j_start = max(startMz - offset, min(mzs))
     j_end = min(endMz + offset, max(mzs))
     array = list(filter(lambda x: x[0] >= j_start and x[0] <= j_end, mzs_intens))
+    if(len(array) == 0):
+        return [0],[0]
     mz, inten = list(zip(*array))
     return mz, inten
 
@@ -96,7 +103,7 @@ class MassSpecSequenceDataset(SequenceDataset):
     _collate_arg_names = ["mark", "mask"] # Names of the two extra tensors that the InformerDataset returns
 
     def setup(self):
-        self.data_dir = self.data_dir or default_data_path / 'informer' / self._name_
+        self.data_dir = self.data_dir or default_data_path
 
         self.dataset_train = self._dataset_cls(
         root_path=self.data_dir,
@@ -105,13 +112,11 @@ class MassSpecSequenceDataset(SequenceDataset):
         offset=self.offset,
         data_path=self._get_data_filename(self.variant),
         target=self.target,
-        scale=self.scale,
-        inverse=self.inverse,
-        timestep=self.timestep,
-        freq=self.freq,
-        cols=self.cols,
-        eval_stamp=self.eval_stamp,
-        eval_mask=self.eval_mask,
+        scale_raw = self.scale_raw,
+        scale_meta = self.scale_meta,
+        maxIT = self.maxIT,
+        meta_features = self.meta_features,
+        timestep=self.timestep
         )
 
         self.dataset_val = self._dataset_cls(
@@ -121,13 +126,11 @@ class MassSpecSequenceDataset(SequenceDataset):
             offset=self.offset,
             data_path=self._get_data_filename(self.variant),
             target=self.target,
-            scale=self.scale,
-            inverse=self.inverse,
-            timestep=self.timestep,
-            freq=self.freq,
-            cols=self.cols,
-            eval_stamp=self.eval_stamp,
-            eval_mask=self.eval_mask,
+            scale_raw = self.scale_raw,
+            scale_meta = self.scale_meta,
+            maxIT = self.maxIT,
+            meta_features = self.meta_features,
+            timestep=self.timestep
         )
 
         self.dataset_test = self._dataset_cls(
@@ -137,13 +140,11 @@ class MassSpecSequenceDataset(SequenceDataset):
             offset=self.offset,
             data_path=self._get_data_filename(self.variant),
             target=self.target,
-            scale=self.scale,
-            inverse=self.inverse,
-            timestep=self.timestep,
-            freq=self.freq,
-            cols=self.cols,
-            eval_stamp=self.eval_stamp,
-            eval_mask=self.eval_mask,
+            scale_raw = self.scale_raw,
+            scale_meta = self.scale_meta,
+            maxIT = self.maxIT,
+            meta_features = self.meta_features,
+            timestep=self.timestep
         )
 
 
@@ -227,6 +228,7 @@ class MassSpecDataset(Dataset):
 
         predictions = []
         for row in range(only_SIM.num_rows):
+            meta = []
             curRow = only_SIM.take([row])
             iit = curRow['iit'][0].as_py()
             if(iit >= self.maxIT):
@@ -234,15 +236,14 @@ class MassSpecDataset(Dataset):
             pagcEnd = curRow['scanBasedOn'][0]
             pagcScanIndex = dict(only_SIM.take([0])['scanHeader'][0])['API PAGC Scan Group Index']
             only_SIM_with_scanIndex = only_pAGC.filter(pc.match_substring_regex(pc.field("pagcScanIndex"), pagcScanIndex))
-            pagcEnd = pc.index(only_SIM_with_scanIndex['scanNumber'], pagcEnd)
+            pagcEnd = int(pc.index(only_SIM_with_scanIndex['scanNumber'], pagcEnd).as_py())
             startMz = curRow['segmented'][0][0][0].as_py()
             endMz = curRow['segmented'][0][0][1].as_py()
-            meta_predictors.append( [(endMz+startMz)/2, (endMz-startMz), 
+            meta = [(endMz+startMz)/2, (endMz-startMz), 
                                     only_SIM_with_scanIndex['retentionTime'][pagcEnd].as_py()
-            ])
+            ]
                                     # curRow['agcs'][0].as_py(), 
                                     #float(dict(curRow['scanHeader'][0])["RawOvFtT"]) ] ) #center, width, agc, rawovftt GLOBAL
-            max_len=0
 
             if (pagcEnd < self.timestep-1 ):
                 startIndex = 0
@@ -258,24 +259,42 @@ class MassSpecDataset(Dataset):
             pagc_filltimes = []
             pagc_tics = []
             for spec in range(len(mzsRaw)):
-                res = _getWithinWindows(mzsRaw[spec], intensRaw[spec], startMz, endMz, offset = self.offset)
+                res = _getWithinWindows(list(mzsRaw[spec].as_py()), list(intensRaw[spec].as_py()), 
+                                       float(startMz), float(endMz), offset = self.offset)
                 mzs.append(res[0])
                 intens.append(res[1])
                 pagc_filltimes = [float(x.as_py()[3][1])
                                     for x in only_SIM_with_scanIndex["scanHeader"][startIndex:endIndex]]
-                pagc_tics = [x.as_py() for x in only_SIM_with_scanIndex["scanHeader"][startIndex:endIndex]]
-            max_len = max(len(i) for i in intens)
-            indices = list(map(lambda x: x.index(min(x)), intens))
-            intens = np.array([np.pad(arr, (0, max_len - len(arr)),
-                                        constant_values=indices[ind])
-                                        for ind, arr in enumerate(intens)])
-            mzs = np.array([np.pad(arr, (0, max_len - len(arr)),
-                                    constant_values=indices[ind])
-                                    for ind, arr in enumerate(mzs)])
-            raw_pagc_filltime.append(pagc_filltimes)
-            raw_pagc_tics.append(pagc_tics)
+                pagc_tics = [x.as_py() for x in only_SIM_with_scanIndex["TIC"][startIndex:endIndex]]
+            if(len(intens) == 0):
+                continue
+            max_len = 128
+            
+            _mzsInputs=[]
+            _intensInputs = []
+            _pagc_fts = []
+            _pagc_tics = []
+            for ind, arr in enumerate(intens):
+ 
+                mzsInput = _split_into_subsequences(list(mzs[ind]),max_len)
+
+                mzsInput = _pad_sequences(mzsInput, max_len, padding_value = 0)
+                intensInput = _split_into_subsequences(list(intens[ind]), max_len)
+                intensInput = _pad_sequences(intensInput, max_len, padding_value = 0)
+                pagc_filltimesInput = [pagc_filltimes[ind] for _ in range(len(intensInput))]
+                pagc_ticsInput = [pagc_tics[ind] for _ in range(len(intensInput))]
+
+                _mzsInputs.extend(mzsInput)
+                _intensInputs.extend(intensInput)
+                _pagc_fts.extend(pagc_filltimesInput)
+                _pagc_tics.extend(pagc_ticsInput)
+            meta_predictors.append(meta)
+        
+            raw_pagc_filltime.append(_pagc_fts[-self.timestep:])
+            raw_pagc_tics.append(_pagc_tics[-self.timestep:])
             predictions.append(iit)
-            xes = np.array(list(zip(mzs, intens))) # mz, intens
+
+            xes = np.array(list(zip(_mzsInputs[-self.timestep:],_intensInputs[-self.timestep:]))) # mz, intens
             xes = xes.reshape((self.timestep, 2, max_len))
             raw_predictors.append(xes)
 
@@ -284,11 +303,16 @@ class MassSpecDataset(Dataset):
         border2 = border2s[self.set_type]
         centers = np.array(meta_predictors)[:, 0]
 
+        raw_predictors = np.array(raw_predictors)
+
+        raw_pagc_filltime = np.array(raw_pagc_filltime)
+        raw_pagc_tics = np.array(raw_pagc_tics)
+        meta_predictors = np.array(meta_predictors)
         # scale meta_data, scale raw_data
         if self.scale_raw:
             self.raw_scaler.scale_mz(raw_predictors, centers)
-            self.raw_scaler.scale_intens(raw_predictors, 1 / raw_pagc_tics)
-            self.raw_scaler.scale_intens(raw_predictors, 1 / raw_pagc_filltime)
+            self.raw_scaler.scale_intens(raw_predictors, raw_pagc_tics)
+            self.raw_scaler.scale_intens(raw_predictors,raw_pagc_filltime)
 
         if self.scale_meta:
             meta_train = meta_predictors[border1s[0] : border2s[0]]
